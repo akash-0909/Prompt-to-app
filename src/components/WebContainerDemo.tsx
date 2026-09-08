@@ -78,10 +78,31 @@ export default function WebContainerDemo() {
 
     startWebContainer();
   }, []);
+  const testBackend = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: "Create a todo application",
+        }),
+      });
 
+      const data = await response.json();
+
+      console.log("Backend response:", data);
+    } catch (error) {
+      console.error("Backend error:", error);
+    }
+  };
   return (
     <div>
       <h1>Prompt-to-App</h1>
+      <button onClick={testBackend}>
+        Test Backend
+      </button>
 
       {url ? (
         <iframe
