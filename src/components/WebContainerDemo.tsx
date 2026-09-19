@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getWebContainer } from "../lib/webcontainer";
+import { getWebContainer } from "./lib/webcontainer.ts;
 
 const files = {
   "package.json": {

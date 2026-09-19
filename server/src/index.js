@@ -1,55 +1,63 @@
-const { GoogleGenAI } = require("@google/genai");
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
+import express from 'express';
+import { GoogleGenAI } from '@google/genai';
+import dotenv from 'dotenv';
 
-const app = express();
-const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
-});
-app.use(cors());
-app.use(express.json());
+dotenv.config();
 
-app.get("/api/health", (req, res) => {
-    res.json(
-        {
-            status: "ok",
-            message: "Prompt-to-app backend is running",
-        }
-    );
-});
+const router = express.Router();
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-app.post("/api/generate", async (req, res) => {
+// System prompt instructing Gemini to return structural project steps
+const SYSTEM_INSTRUCTION = `
+You are an expert AI developer workspace assistant.
+When a user asks to generate or update a web application, break down the project into explicit files and shell commands.
+
+Return your response strictly wrapped inside the following XML tag format:
+
+<project>
+  <file path="src/App.jsx">
+    <![CDATA[
+    // File content here
+    ]]>
+  </file>
+  <file path="package.json">
+    <![CDATA[
+    // Package.json content here
+    ]]>
+  </file>
+  <command>
+    npm install
+  </command>
+</project>
+
+Rules:
+1. Always return a complete, runnable React application styled with Tailwind CSS.
+2. Ensure file paths are relative to the project root.
+3. Keep external dependencies minimal so WebContainers can install them quickly.
+`;
+
+// Route to generate app files based on user prompt
+router.post('/chat', async (req, res) => {
+  const { prompt } = req.body;
+
+  if (!prompt) {
+    return res.status(400).json({ error: 'Prompt is required.' });
+  }
+
   try {
-    const { prompt } = req.body;
-
-    console.log("Received prompt:", prompt);
-
-    const interaction = await ai.interactions.create({
-      model: "gemini-3.8-flash",
-      input: prompt,
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+      },
     });
 
-    console.log("Gemini response received!");
-
-    res.json({
-      success: true,
-      response: interaction.output_text,
-    });
-
+    res.json({ result: response.text });
   } catch (error) {
-    console.error("Gemini error:", error);
-
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    console.error('Gemini API Error:', error);
+    res.status(500).json({ error: 'Failed to generate code with Gemini API.' });
   }
 });
 
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
-
+export default router;
