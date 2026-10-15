@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { getWebContainer } from "./lib/webcontainer.ts;
-
+import { getWebContainer } from "../lib/webcontainer";
 const files = {
   "package.json": {
     file: {
@@ -35,6 +34,8 @@ const files = {
 };
 
 export default function WebContainerDemo() {
+  const [responseText, setResponseText] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
   const [url, setUrl] = useState("");
 
   useEffect(() => {
@@ -80,30 +81,100 @@ export default function WebContainerDemo() {
   }, []);
   const testBackend = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt: "Create a todo application",
-        }),
-      });
+      setResponseText("");
+      setIsGenerating(true);
 
-      const data = await response.json();
+      const response = await fetch(
+        "http://localhost:5000/api/generate",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt: "Create a simple todo application",
+          }),
+        }
+      );
 
-      console.log("Backend response:", data);
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+
+      if (!response.body) {
+        throw new Error("Response body is empty");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+
+        if (done) break;
+
+        // Convert bytes → string
+        buffer += decoder.decode(value, {
+          stream: true,
+        });
+
+        // SSE events are separated by a blank line
+        const events = buffer.split(/\r?\n\r?\n/);
+
+        // Last part may be incomplete
+        buffer = events.pop() ?? "";
+
+        for (const event of events) {
+          const lines = event.split(/\r?\n/);
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) {
+              continue;
+            }
+
+            const data = line.slice(6);
+
+            if (data === "[DONE]") {
+              continue;
+            }
+
+            const text = JSON.parse(data);
+
+            setResponseText((prev) => prev + text);
+          }
+        }
+      }
+
     } catch (error) {
-      console.error("Backend error:", error);
+      console.error("Streaming error:", error);
+    } finally {
+      setIsGenerating(false);
     }
   };
   return (
     <div>
       <h1>Prompt-to-App</h1>
-      <button onClick={testBackend}>
-        Test Backend
+      <button onClick={testBackend} disabled={isGenerating}>
+        {isGenerating ? "Generating..." : "Test Gemini"}
       </button>
+      <div>
+        <h2>Gemini Response</h2>
 
+        <pre
+          style={{
+            whiteSpace: "pre-wrap",
+            border: "1px solid #ccc",
+            padding: "10px",
+            minHeight: "200px",
+          }}
+        >
+          {responseText}
+        </pre>
+
+        {isGenerating && <p>Generating...</p>}
+      </div>
       {url ? (
         <iframe
           src={url}
