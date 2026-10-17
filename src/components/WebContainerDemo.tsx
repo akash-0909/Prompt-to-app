@@ -2,7 +2,60 @@
 import { useEffect, useState } from "react";
 import type { WebContainer } from "@webcontainer/api";
 import { getWebContainer } from "../lib/webcontainer";
-import { parseXmlToFileTree } from "../lib/fileTree";
+import {
+  parseXmlToFileTree,
+  type FileTree,
+  type WebContainerNode,
+} from "../lib/fileTree";
+import CodeEditor from "./CodeEditor";
+import FileExplorer from "./FileExplorer";
+
+function flattenFileTree(
+  tree: FileTree,
+  prefix = "",
+  result: Record<string, string> = {}
+): Record<string, string> {
+  for (const [name, node] of Object.entries(tree)) {
+    const path = prefix ? `${prefix}/${name}` : name;
+
+    if ("file" in node) {
+      result[path] = node.file.contents;
+    } else {
+      flattenFileTree(node.directory, path, result);
+    }
+  }
+
+  return result;
+}
+
+function updateFileTree(
+  tree: FileTree,
+  path: string,
+  contents: string
+): FileTree {
+  const parts = path.split("/");
+  const updated = { ...tree };
+  let current = updated;
+
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    const node = current[part];
+
+    if (!node || !("directory" in node)) {
+      throw new Error(`Directory not found: ${part}`);
+    }
+
+    const copiedDirectory = { ...node.directory };
+    current[part] = { directory: copiedDirectory };
+    current = copiedDirectory;
+  }
+
+  current[parts[parts.length - 1]] = {
+    file: { contents },
+  };
+
+  return updated;
+}
 
 export default function WebContainerDemo() {
   const [container, setContainer] = useState<WebContainer | null>(null);
@@ -14,6 +67,10 @@ export default function WebContainerDemo() {
   const [isRunning, setIsRunning] = useState(false);
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
+
+  const [fileTree, setFileTree] = useState<FileTree>({});
+  const [files, setFiles] = useState<Record<string, string>>({});
+  const [selectedFile, setSelectedFile] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -62,9 +119,7 @@ export default function WebContainerDemo() {
         "http://localhost:5000/api/generate",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt }),
         }
       );
@@ -132,76 +187,94 @@ export default function WebContainerDemo() {
 
       buffer += decoder.decode();
 
-      if (receivedDone) {
-        // Process any remaining complete event before the DONE marker
-        // was received only if it is present in the remaining buffer.
-        if (buffer.trim()) {
-          processEvent(buffer);
-        }
-      }
-
       if (!receivedDone) {
         throw new Error("Generation ended before the DONE marker.");
       }
 
-      const fileTree = parseXmlToFileTree(generatedCode);
+      const parsedTree = parseXmlToFileTree(generatedCode);
 
-      if (Object.keys(fileTree).length === 0) {
-        throw new Error(
-          "No files were parsed. Check Gemini's file-tag format."
-        );
+      if (Object.keys(parsedTree).length === 0) {
+        throw new Error("No files were parsed from Gemini's response.");
       }
 
-      if (!fileTree["package.json"]) {
-        throw new Error(
-          "Generated output must include a root package.json."
-        );
+      if (
+        !parsedTree["package.json"] ||
+        !("file" in parsedTree["package.json"])
+      ) {
+        throw new Error("Generated output needs a root package.json.");
       }
 
-      console.log("Generated file tree:", fileTree);
+      const flatFiles = flattenFileTree(parsedTree);
+
+      if (!flatFiles["package.json"]) {
+        throw new Error("The generated package.json is empty.");
+      }
 
       setIsRunning(true);
       setUrl("");
 
-      await container.mount(fileTree);
+      await container.mount(parsedTree);
+
+      setFileTree(parsedTree);
+      setFiles(flatFiles);
+      setSelectedFile(Object.keys(flatFiles)[0] ?? "");
 
       const install = await container.spawn("npm", ["install"]);
       const installExitCode = await install.exit;
 
       if (installExitCode !== 0) {
-        throw new Error("npm install failed. Check the generated package.json.");
+        throw new Error("npm install failed.");
       }
 
       const devProcess = await container.spawn("npm", ["run", "dev"]);
-
-      // Keep the dev server process alive inside WebContainer.
       void devProcess;
 
       console.log("Generated app started!");
     } catch (err) {
       console.error("Generation or execution error:", err);
-      setError(
-        err instanceof Error ? err.message : "Something went wrong."
-      );
+      setError(err instanceof Error ? err.message : "Something went wrong.");
       setIsRunning(false);
     } finally {
       setIsGenerating(false);
     }
   };
 
+  const handleFileChange = async (contents: string) => {
+    if (!container || !selectedFile) return;
+
+    setFiles((previous) => ({
+      ...previous,
+      [selectedFile]: contents,
+    }));
+
+    setFileTree((previous) =>
+      updateFileTree(previous, selectedFile, contents)
+    );
+
+    try {
+      await container.fs.writeFile(`/${selectedFile}`, contents);
+    } catch (err) {
+      console.error("Could not write file:", err);
+      setError(
+        `Could not save ${selectedFile} to the WebContainer filesystem.`
+      );
+    }
+  };
+
   return (
-    <div style={{ padding: "20px" }}>
+    <div style={{ padding: 20, color: "#ddd", background: "#111", minHeight: "100vh" }}>
       <h1>Prompt-to-App</h1>
 
       <textarea
         value={prompt}
         onChange={(event) => setPrompt(event.target.value)}
         placeholder="Describe the application you want..."
-        rows={4}
+        rows={3}
         style={{
           width: "100%",
-          padding: "10px",
+          padding: 10,
           boxSizing: "border-box",
+          marginBottom: 10,
         }}
       />
 
@@ -218,26 +291,46 @@ export default function WebContainerDemo() {
               : "Generate & Run App"}
       </button>
 
-      {error && (
-        <p style={{ color: "red" }}>
-          Error: {error}
-        </p>
-      )}
+      {error && <p style={{ color: "#ff7777" }}>Error: {error}</p>}
 
       <h2>Gemini Response</h2>
       <pre
         style={{
           whiteSpace: "pre-wrap",
           overflowWrap: "anywhere",
-          border: "1px solid #ccc",
-          padding: "10px",
-          minHeight: "150px",
-          maxHeight: "350px",
+          border: "1px solid #444",
+          padding: 10,
+          maxHeight: 200,
           overflowY: "auto",
         }}
       >
         {responseText}
       </pre>
+
+      <h2>Generated Code</h2>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          alignItems: "stretch",
+          flexWrap: "wrap",
+        }}
+      >
+        <FileExplorer
+          files={Object.keys(files).sort()}
+          selectedFile={selectedFile}
+          onSelect={setSelectedFile}
+        />
+
+        <div style={{ flex: 1, minWidth: 300 }}>
+          <CodeEditor
+            fileName={selectedFile || "No file selected"}
+            code={files[selectedFile] ?? ""}
+            onChange={handleFileChange}
+          />
+        </div>
+      </div>
 
       <h2>Live Preview</h2>
 
@@ -247,8 +340,8 @@ export default function WebContainerDemo() {
           title="Generated App Preview"
           style={{
             width: "100%",
-            height: "500px",
-            border: "1px solid #ccc",
+            height: 500,
+            border: "1px solid #444",
           }}
         />
       ) : (
