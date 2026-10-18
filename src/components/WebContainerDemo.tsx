@@ -58,6 +58,7 @@ function updateFileTree(
 }
 
 export default function WebContainerDemo() {
+  const [previewKey, setPreviewKey] = useState(0);
   const [container, setContainer] = useState<WebContainer | null>(null);
   const [prompt, setPrompt] = useState(
     "Create a simple todo application"
@@ -261,60 +262,133 @@ export default function WebContainerDemo() {
     }
   };
 
-  return (
-    <div style={{ padding: 20, color: "#ddd", background: "#111", minHeight: "100vh" }}>
-      <h1>Prompt-to-App</h1>
-
-      <textarea
-        value={prompt}
-        onChange={(event) => setPrompt(event.target.value)}
-        placeholder="Describe the application you want..."
-        rows={3}
-        style={{
-          width: "100%",
-          padding: 10,
-          boxSizing: "border-box",
-          marginBottom: 10,
-        }}
-      />
+  
+return (
+  <div
+   style={{
+  width: "100%",
+  minHeight: "100vh",
+  background: "#111318",
+  color: "#e5e7eb",
+  padding: "16px 20px",
+  boxSizing: "border-box",
+}}
+  >
+    {/* Header */}
+    <header
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 16,
+        flexWrap: "wrap",
+        marginBottom: 16,
+      }}
+    >
+      <div>
+        <h1 style={{ margin: 0 }}>Prompt-to-App</h1>
+        <p style={{ color: "#9ca3af", margin: "6px 0 0" }}>
+          Build, edit, and preview AI-generated applications
+        </p>
+      </div>
 
       <button
         onClick={generateApp}
-        disabled={!container || isGenerating || isRunning || !prompt.trim()}
+        disabled={
+          !container ||
+          isGenerating ||
+          isRunning ||
+          !prompt.trim()
+        }
+        style={{
+          padding: "10px 18px",
+          border: 0,
+          borderRadius: 8,
+          background: "#635bff",
+          color: "#fff",
+          cursor: "pointer",
+          fontWeight: 600,
+        }}
       >
         {!container
           ? "Starting WebContainer..."
           : isGenerating
             ? "Generating..."
             : isRunning
-              ? "Installing and starting app..."
-              : "Generate & Run App"}
+              ? "Installing and starting..."
+              : "Generate & Run"}
       </button>
+    </header>
 
-      {error && <p style={{ color: "#ff7777" }}>Error: {error}</p>}
+    {/* Prompt */}
+    <div style={{ marginBottom: 12 }}>
+      <textarea
+        value={prompt}
+        onChange={(event) => setPrompt(event.target.value)}
+        placeholder="Describe the app you want to build..."
+        rows={2}
+        style={{
+          width: "100%",
+          padding: 12,
+          boxSizing: "border-box",
+          border: "1px solid #343844",
+          borderRadius: 8,
+          background: "#1b1e26",
+          color: "#fff",
+          resize: "vertical",
+        }}
+      />
+    </div>
 
-      <h2>Gemini Response</h2>
+    {error && (
+      <p style={{ color: "#f87171" }}>
+        {error}
+      </p>
+    )}
+
+    {/* Generation output */}
+    <details style={{ marginBottom: 16 }}>
+      <summary style={{ cursor: "pointer", color: "#a5b4fc" }}>
+        Gemini response — {responseText.length} characters
+      </summary>
+
       <pre
         style={{
           whiteSpace: "pre-wrap",
           overflowWrap: "anywhere",
-          border: "1px solid #444",
-          padding: 10,
-          maxHeight: 200,
-          overflowY: "auto",
+          maxHeight: 220,
+          overflow: "auto",
+          padding: 12,
+          background: "#1b1e26",
+          border: "1px solid #343844",
+          borderRadius: 8,
         }}
       >
-        {responseText}
+        {responseText || "Generated source will appear here."}
       </pre>
+    </details>
 
-      <h2>Generated Code</h2>
-
-      <div
+    {/* Three-panel workspace */}
+    <div
+      style={{
+  display: "grid",
+  gridTemplateColumns:
+    "minmax(200px, 0.75fr) minmax(400px, 1.5fr) minmax(400px, 1.5fr)",
+  gap: 12,
+  alignItems: "stretch",
+  width: "100%",
+  minHeight: "calc(100vh - 230px)",
+}}
+    >
+      {/* File Explorer */}
+      <section
         style={{
-          display: "flex",
-          gap: 12,
-          alignItems: "stretch",
-          flexWrap: "wrap",
+          minWidth: 0,
+          background: "#181a20",
+          border: "1px solid #343844",
+          borderRadius: 8,
+          padding: 8,
+          overflow: "auto",
         }}
       >
         <FileExplorer
@@ -322,35 +396,122 @@ export default function WebContainerDemo() {
           selectedFile={selectedFile}
           onSelect={setSelectedFile}
         />
+      </section>
 
-        <div style={{ flex: 1, minWidth: 300 }}>
-          <CodeEditor
-            fileName={selectedFile || "No file selected"}
-            code={files[selectedFile] ?? ""}
-            onChange={handleFileChange}
-          />
-        </div>
-      </div>
-
-      <h2>Live Preview</h2>
-
-      {url ? (
-        <iframe
-          src={url}
-          title="Generated App Preview"
+      {/* Code Editor */}
+      <section
+        style={{
+          minWidth: 0,
+          background: "#181a20",
+          border: "1px solid #343844",
+          borderRadius: 8,
+          padding: 8,
+          overflow: "hidden",
+        }}
+      >
+        <h3
           style={{
-            width: "100%",
-            height: 500,
-            border: "1px solid #444",
+            margin: "8px 8px 14px",
+            fontSize: 13,
+            overflowWrap: "anywhere",
           }}
+        >
+          {selectedFile || "CODE EDITOR"}
+        </h3>
+
+        <CodeEditor
+          fileName={selectedFile || "No file selected"}
+          code={files[selectedFile] ?? ""}
+          onChange={handleFileChange}
         />
-      ) : (
-        <p>
-          {isRunning
-            ? "Installing dependencies and starting the app..."
-            : "Your generated app will appear here."}
-        </p>
-      )}
+      </section>
+
+      {/* Live Preview */}
+      <section
+        style={{
+          minWidth: 0,
+          background: "#181a20",
+          border: "1px solid #343844",
+          borderRadius: 8,
+          padding: 8,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+            margin: "0 4px 12px",
+          }}
+        >
+          <h3 style={{ margin: 4, fontSize: 13 }}>
+            LIVE PREVIEW
+          </h3>
+
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              onClick={() => setPreviewKey((key) => key + 1)}
+              disabled={!url}
+              title="Reload preview"
+            >
+              ↻ Refresh
+            </button>
+
+            <button
+              onClick={() => {
+                if (url) {
+                  window.open(url, "_blank", "noopener,noreferrer");
+                }
+              }}
+              disabled={!url}
+              title="Open preview in a new tab"
+            >
+              ↗ Open
+            </button>
+          </div>
+        </div>
+
+        {url ? (
+          <iframe
+            key={previewKey}
+            src={url}
+            title="Generated app preview"
+            style={{
+              width: "100%",
+              flex: 1,
+              minHeight: 560,
+              border: "1px solid #343844",
+              borderRadius: 6,
+              background: "#fff",
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              flex: 1,
+              minHeight: 560,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              textAlign: "center",
+              color: "#9ca3af",
+              padding: 16,
+            }}
+          >
+            {isGenerating
+              ? "Generating your application..."
+              : isRunning
+                ? "Installing dependencies and starting the server..."
+                : "Generate an app to see its preview here."}
+          </div>
+        )}
+      </section>
     </div>
-  );
+  </div>
+);
+
 }

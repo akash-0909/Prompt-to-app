@@ -1,3 +1,14 @@
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 0;
+}
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -108,4 +119,20 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+html,
+body,
+#root {
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  margin: 0;
+}
+
+body {
+  min-width: 0;
+}
+
+#root {
+  padding: 0;
 }

@@ -15,11 +15,12 @@ export default function CodeEditor({
   return (
     <div
       style={{
-        height: "500px",
-        border: "1px solid #30363d",
-        borderRadius: "8px",
-        overflow: "hidden",
-      }}
+  height: "calc(100vh - 300px)",
+  minHeight: "500px",
+  border: "1px solid #30363d",
+  borderRadius: "8px",
+  overflow: "hidden",
+}}
     >
       <div
         style={{
