@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { WebContainer } from "@webcontainer/api";
 import { getWebContainer } from "../lib/webcontainer";
+import { Group, Panel, Separator } from "react-resizable-panels";
 import {
   parseXmlToFileTree,
   type FileTree,
@@ -58,6 +59,7 @@ function updateFileTree(
 }
 
 export default function WebContainerDemo() {
+  
   const [previewKey, setPreviewKey] = useState(0);
   const [container, setContainer] = useState<WebContainer | null>(null);
   const [prompt, setPrompt] = useState(
@@ -369,148 +371,175 @@ return (
     </details>
 
     {/* Three-panel workspace */}
-    <div
+    
+<Group
+  orientation="horizontal"
+  style={{
+    width: "100%",
+    height: "calc(100vh - 230px)",
+    minHeight: "620px",
+    border: "1px solid #343844",
+    borderRadius: "8px",
+    overflow: "hidden",
+  }}
+>
+  {/* Explorer */}
+  <Panel id="explorer" defaultSize="18%" minSize="12%">
+    <section
       style={{
-  display: "grid",
-  gridTemplateColumns:
-    "minmax(200px, 0.75fr) minmax(400px, 1.5fr) minmax(400px, 1.5fr)",
-  gap: 12,
-  alignItems: "stretch",
-  width: "100%",
-  minHeight: "calc(100vh - 230px)",
-}}
+        height: "100%",
+        minWidth: 0,
+        background: "#181a20",
+        padding: 8,
+        boxSizing: "border-box",
+        overflow: "auto",
+      }}
     >
-      {/* File Explorer */}
-      <section
-        style={{
-          minWidth: 0,
-          background: "#181a20",
-          border: "1px solid #343844",
-          borderRadius: 8,
-          padding: 8,
-          overflow: "auto",
-        }}
-      >
-        <FileExplorer
-          files={Object.keys(files).sort()}
-          selectedFile={selectedFile}
-          onSelect={setSelectedFile}
-        />
-      </section>
+      <FileExplorer
+        files={Object.keys(files).sort()}
+        selectedFile={selectedFile}
+        onSelect={setSelectedFile}
+      />
+    </section>
+  </Panel>
 
-      {/* Code Editor */}
-      <section
+  <Separator
+    style={{
+      width: "6px",
+      background: "#343844",
+      cursor: "col-resize",
+    }}
+  />
+
+  {/* Code Editor */}
+  <Panel id="editor" defaultSize="42%" minSize="25%">
+    <section
+      style={{
+        height: "100%",
+        minWidth: 0,
+        background: "#181a20",
+        padding: 8,
+        boxSizing: "border-box",
+        overflow: "auto",
+      }}
+    >
+      <h3
         style={{
-          minWidth: 0,
-          background: "#181a20",
-          border: "1px solid #343844",
-          borderRadius: 8,
-          padding: 8,
-          overflow: "hidden",
+          margin: "8px 8px 14px",
+          fontSize: 13,
+          overflowWrap: "anywhere",
         }}
       >
-        <h3
-          style={{
-            margin: "8px 8px 14px",
-            fontSize: 13,
-            overflowWrap: "anywhere",
-          }}
-        >
-          {selectedFile || "CODE EDITOR"}
+        {selectedFile || "CODE EDITOR"}
+      </h3>
+
+      <CodeEditor
+        fileName={selectedFile || "No file selected"}
+        code={files[selectedFile] ?? ""}
+        onChange={handleFileChange}
+      />
+    </section>
+  </Panel>
+
+  <Separator
+    style={{
+      width: "6px",
+      background: "#343844",
+      cursor: "col-resize",
+    }}
+  />
+
+  {/* Live Preview */}
+  <Panel id="preview" defaultSize="40%" minSize="25%">
+    <section
+      style={{
+        height: "100%",
+        minWidth: 0,
+        background: "#181a20",
+        padding: 8,
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 8,
+          flexWrap: "wrap",
+          margin: "0 4px 12px",
+        }}
+      >
+        <h3 style={{ margin: 4, fontSize: 13 }}>
+          LIVE PREVIEW
         </h3>
 
-        <CodeEditor
-          fileName={selectedFile || "No file selected"}
-          code={files[selectedFile] ?? ""}
-          onChange={handleFileChange}
-        />
-      </section>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            onClick={() => setPreviewKey((key) => key + 1)}
+            disabled={!url}
+          >
+            ↻ Refresh
+          </button>
 
-      {/* Live Preview */}
-      <section
-        style={{
-          minWidth: 0,
-          background: "#181a20",
-          border: "1px solid #343844",
-          borderRadius: 8,
-          padding: 8,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+          <button
+            onClick={() => {
+              if (url) {
+                window.open(
+                  url,
+                  "_blank",
+                  "noopener,noreferrer"
+                );
+              }
+            }}
+            disabled={!url}
+          >
+            ↗ Open
+          </button>
+        </div>
+      </div>
+
+      {url ? (
+        <iframe
+          key={previewKey}
+          src={url}
+          title="Generated app preview"
+          style={{
+            width: "100%",
+            flex: 1,
+            minHeight: 0,
+            border: "1px solid #343844",
+            borderRadius: 6,
+            background: "#fff",
+          }}
+        />
+      ) : (
         <div
           style={{
+            flex: 1,
+            minHeight: 0,
             display: "flex",
-            justifyContent: "space-between",
             alignItems: "center",
-            gap: 8,
-            flexWrap: "wrap",
-            margin: "0 4px 12px",
+            justifyContent: "center",
+            textAlign: "center",
+            color: "#9ca3af",
+            padding: 16,
           }}
         >
-          <h3 style={{ margin: 4, fontSize: 13 }}>
-            LIVE PREVIEW
-          </h3>
-
-          <div style={{ display: "flex", gap: 6 }}>
-            <button
-              onClick={() => setPreviewKey((key) => key + 1)}
-              disabled={!url}
-              title="Reload preview"
-            >
-              ↻ Refresh
-            </button>
-
-            <button
-              onClick={() => {
-                if (url) {
-                  window.open(url, "_blank", "noopener,noreferrer");
-                }
-              }}
-              disabled={!url}
-              title="Open preview in a new tab"
-            >
-              ↗ Open
-            </button>
-          </div>
+          {isGenerating
+            ? "Generating your application..."
+            : isRunning
+              ? "Installing dependencies and starting the server..."
+              : "Generate an app to see its preview here."}
         </div>
+      )}
+    </section>
+  </Panel>
+</Group>
 
-        {url ? (
-          <iframe
-            key={previewKey}
-            src={url}
-            title="Generated app preview"
-            style={{
-              width: "100%",
-              flex: 1,
-              minHeight: 560,
-              border: "1px solid #343844",
-              borderRadius: 6,
-              background: "#fff",
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              flex: 1,
-              minHeight: 560,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              textAlign: "center",
-              color: "#9ca3af",
-              padding: 16,
-            }}
-          >
-            {isGenerating
-              ? "Generating your application..."
-              : isRunning
-                ? "Installing dependencies and starting the server..."
-                : "Generate an app to see its preview here."}
-          </div>
-        )}
-      </section>
-    </div>
   </div>
 );
 
